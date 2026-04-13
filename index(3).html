@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم يوتوبيا - الإدارة والدعم</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- مكتبة Flatpickr للتقويم الاحترافي -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/dark.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        body { 
+            font-family: 'Cairo', sans-serif; 
+            background-image: url('https://ywbmamklqyrahwqifqdj.supabase.co/storage/v1/object/public/books-images/oo.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: #e6d5b8; 
+            margin: 0; 
+        }
+        .admin-overlay { 
+            background: rgba(0, 0, 0, 0.55); 
+            backdrop-filter: blur(4px); 
+            min-height: 100vh; 
+            padding: 20px; 
+        }
+        .admin-container { max-width: 1200px; margin: 0 auto; }
+        h1 { 
+            color: #d4a373; 
+            text-align: center; 
+            margin-bottom: 20px; 
+            border-bottom: 2px solid rgba(212, 163, 115, 0.4); 
+            padding-bottom: 10px; 
+            text-shadow: 0 0 20px rgba(212, 163, 115, 0.5); 
+            font-weight: 900;
+            font-size: 1.8rem;
+        }
+        h3 { color: #d4a373; margin-top: 0; }
+
+        /* إحصائيات الداشبورد */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: rgba(20, 15, 10, 0.35);
+            backdrop-filter: blur(20px);
+            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(212, 163, 115, 0.3);
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+            transition: 0.3s;
+        }
+        .stat-card:hover { transform: translateY(-8px); border-color: #d4a373; box-shadow: 0 0 20px rgba(212, 163, 115, 0.4); }
+        .stat-card i { 
+            font-size: 1.5rem; 
+            margin-bottom: 8px; 
+            display: block; 
+            transition: 0.4s;
+            filter: drop-shadow(0 0 10px currentColor);
+        }
+        .stat-card:hover i { transform: scale(1.2) rotate(8deg); filter: drop-shadow(0 0 15px currentColor); }
+        .stat-card span { font-size: 0.75rem; font-weight: bold; opacity: 0.8; display: block; margin-bottom: 3px; color: #e6d5b8; }
+        .stat-card b { font-size: 1.5rem; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.4); }
+
+        /* انميشن الأيقونات الموحد */
+        @keyframes iconFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-4px); }
+        }
+        .stat-card i, .filter-input-wrapper i, th i, .status-badge i, .wa-link i { 
+            animation: iconFloat 3s infinite ease-in-out; 
+            display: inline-block;
+        }
+
+        /* انميشن النبض للجرس الجديد */
+        @keyframes pulse-gold {
+            0% { transform: scale(1); filter: drop-shadow(0 0 2px #ffea00); }
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 15px #ffea00); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 2px #ffea00); }
+        }
+        .pulse-icon { animation: pulse-gold 2s infinite ease-in-out; }
+
+        /* تحسين مظهر البادج (حالة الطلب) */
+        .status-badge { 
+            padding: 4px 10px; 
+            border-radius: 50px; 
+            font-size: 0.7rem; 
+            font-weight: bold; 
+            border: 1px solid rgba(255,255,255,0.1);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: 0.3s;
+            filter: drop-shadow(0 0 5px rgba(0,0,0,0.5));
+        }
+        .badge-pending { background: rgba(255, 215, 0, 0.15); color: #ffd700; border-color: #ffd700; box-shadow: 0 0 20px rgba(255, 215, 0, 0.4); text-shadow: 0 0 8px #ffd700; }
+        .badge-shipping { background: rgba(0, 191, 255, 0.15); color: #00bfff; border-color: #00bfff; box-shadow: 0 0 20px rgba(0, 191, 255, 0.4); text-shadow: 0 0 8px #00bfff; }
+        .badge-shipped { background: rgba(0, 255, 255, 0.15); color: #00ffff; border-color: #00ffff; box-shadow: 0 0 20px rgba(0, 255, 255, 0.4); text-shadow: 0 0 8px #00ffff; }
+        .badge-completed { background: rgba(57, 255, 20, 0.15); color: #39ff14; border-color: #39ff14; box-shadow: 0 0 20px rgba(57, 255, 20, 0.4); text-shadow: 0 0 8px #39ff14; }
+        .badge-returned { background: rgba(255, 0, 0, 0.15); color: #ff0000; border-color: #ff0000; box-shadow: 0 0 20px rgba(255, 0, 0, 0.4); text-shadow: 0 0 8px #ff0000; }
+        .wa-link { color: #25D366; font-size: 1.2rem; text-decoration: none; transition: 0.3s; }
+        .wa-link:hover { transform: scale(1.2); filter: brightness(1.2); }
+        
+        /* تنسيق الجدول */
+        .table-wrapper { 
+            background: rgba(20, 15, 10, 0.75); 
+            backdrop-filter: blur(15px); 
+            border-radius: 15px; 
+            overflow-x: auto; 
+            border: 1px solid rgba(212,163,115,0.2); 
+            margin-bottom: 25px; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6); 
+        }
+        table { width: 100%; border-collapse: collapse; text-align: right; min-width: 800px; }
+        th { background: rgba(20, 15, 10, 0.85); color: #d4a373; padding: 12px; font-size: 0.85rem; border-bottom: 2px solid #d4a373; }
+        td { padding: 8px 10px; border-bottom: 1px solid rgba(212,163,115,0.1); font-size: 0.8rem; }
+        tr:hover { background: rgba(212, 163, 115, 0.1); cursor: pointer; }
+        tr.active { background: rgba(212, 163, 115, 0.2); border-right: 5px solid #d4a373; }
+
+        /* تنسيق قسم الفلاتر */
+        .filters-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            background: rgba(20, 15, 10, 0.75);
+            backdrop-filter: blur(15px);
+            padding: 18px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(212,163,115,0.2);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label { font-size: 0.85rem; color: #d4a373; font-weight: bold; margin-bottom: 2px; display: flex; align-items: center; gap: 5px; }
+        
+        .filter-input-wrapper { position: relative; display: flex; align-items: center; }
+        .filter-input-wrapper i { position: absolute; right: 12px; color: #d4a373; opacity: 0.7; pointer-events: none; }
+        
+        .filter-group input, .filter-group select {
+            width: 100%;
+            padding: 8px 30px 8px 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(212,163,115,0.4);
+            border-radius: 10px;
+            color: #e6d5b8;
+            outline: none;
+            font-size: 0.8rem;
+            transition: 0.3s;
+        }
+        .filter-group input:focus, .filter-group select:focus {
+            border-color: #d4a373;
+            background: rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 10px rgba(212,163,115,0.2);
+        }
+
+        .reset-all-btn {
+            background: rgba(231, 76, 60, 0.1);
+            border: 1px solid #e74c3c;
+            color: #e74c3c;
+            border-radius: 8px;
+            padding: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            align-self: flex-end;
+        }
+        .reset-all-btn:hover { background: #e74c3c; color: white; }
+
+        /* إصلاح لون الخيارات في القوائم المنسدلة */
+        .filter-group select option {
+            background-color: #2c1b10;
+            color: white;
+        }
+        
+        /* تخصيص ألوان التقويم الاحترافي Flatpickr لتناسب يوتوبيا */
+        .flatpickr-calendar {
+            background: #2c1b10 !important;
+            border: 1px solid #d4a373 !important;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
+            font-family: 'Cairo', sans-serif !important;
+        }
+        .flatpickr-day.selected {
+            background: #d4a373 !important;
+            border-color: #d4a373 !important;
+            color: #1a140f !important;
+        }
+        .flatpickr-day:hover { background: rgba(212, 163, 115, 0.2) !important; }
+        .flatpickr-current-month, .flatpickr-weekday { color: #d4a373 !important; }
+        .flatpickr-day { color: #e6d5b8 !important; }
+        .flatpickr-months .flatpickr-prev-month, .flatpickr-months .flatpickr-next-month {
+            fill: #d4a373 !important;
+        }
+
+        .date-filter-wrapper {
+            display: flex;
+            gap: 5px;
+        }
+        .date-quick-btn {
+            background: rgba(212, 163, 115, 0.1);
+            border: 1px solid rgba(212, 163, 115, 0.3);
+            color: #d4a373;
+            border-radius: 8px;
+            padding: 0 12px;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .date-quick-btn:hover {
+            background: #d4a373;
+            color: #1a140f;
+        }
+        th.sortable:hover { color: white; cursor: pointer; background: #3d2b1f; }
+
+        /* تنسيق الأزرار والحالات */
+        .btn-view { background: #d4a373; color: #1a140f; border: none; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+
+        /* القسم السفلي: تفاصيل وشات */
+        .details-chat-grid { display: grid; grid-template-columns: 1fr; gap: 20px; display: none; margin-top: 30px; }
+        @media (min-width: 900px) { .details-chat-grid { grid-template-columns: 1fr 1fr; } }
+        
+        .card { background: rgba(20, 15, 10, 0.35); backdrop-filter: blur(20px); padding: 20px; border-radius: 15px; border: 1px solid rgba(212,163,115,0.2); box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
+        
+        .chat-container { display: flex; flex-direction: column; height: 500px; }
+        #chat-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; border: 1px solid rgba(212,163,115,0.2); border-radius: 10px; }
+        .msg { padding: 10px 15px; border-radius: 15px; max-width: 70%; font-size: 0.9rem; }
+        .msg-user { background: rgba(212, 163, 115, 0.1); align-self: flex-start; }
+        .msg-admin { background: #d4a373; color: #2c1b10; align-self: flex-end; font-weight: bold; }
+        .input-area { padding: 15px 0 0 0; display: flex; gap: 10px; }
+        input { flex: 1; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid #d4a373; border-radius: 10px; color: white; outline: none; }
+        .send-btn { padding: 10px 25px; background: #d4a373; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; color: #1a140f; }
+        
+        .order-details-box { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px dashed #d4a373; font-size: 0.9rem; }
+        .order-item-row { display: flex; justify-content: space-between; margin-bottom: 5px; opacity: 0.9; }
+
+        .export-btn {
+            background: #27ae60; color: white; border: none; padding: 12px 25px;
+            border-radius: 50px; cursor: pointer; font-weight: bold;
+            display: flex; align-items: center; gap: 8px;
+            position: fixed; bottom: 30px; left: 30px; z-index: 2000;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+            transition: 0.3s;
+        }
+        .export-btn:hover { background: #219150; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="admin-overlay">
+    <div class="admin-container">
+        <h1>يوتوبيا لاند Dashboard 📚</h1>
+
+        <!-- لوحة الإحصائيات -->
+        <div class="stats-grid" id="stats-dashboard">
+            <div class="stat-card" style="border-color: #8a2be2;">
+                <i class="bi bi-list-ul" style="color: #8a2be2; filter: drop-shadow(0 0 15px #8a2be2);"></i>
+                <span>إجمالي الطلبات</span>
+                <b id="stat-total">0</b>
+            </div>
+            <div class="stat-card" style="border-color: #ffd700;">
+                <i class="bi bi-lightning-charge-fill pulse-icon" style="color: #ffd700; filter: drop-shadow(0 0 10px #ffd700);"></i>
+                <span>طلبات جديدة</span>
+                <b id="stat-pending">0</b>
+            </div>
+            <div class="stat-card" style="border-color: #00bfff;">
+                <i class="bi bi-truck-flatbed" style="color: #00bfff; filter: drop-shadow(0 0 15px #00bfff);"></i>
+                <span>جاري شحنها</span>
+                <b id="stat-shipping">0</b>
+            </div>
+            <div class="stat-card" style="border-color: #00ffff;">
+                <i class="bi bi-box-seam-fill" style="color: #00ffff; filter: drop-shadow(0 0 15px #00ffff);"></i>
+                <span>تم شحنها</span>
+                <b id="stat-shipped">0</b>
+            </div>
+            <div class="stat-card" style="border-color: #39ff14;">
+                <i class="bi bi-check-circle-fill" style="color: #39ff14; filter: drop-shadow(0 0 15px #39ff14);"></i>
+                <span>تم توصيلها</span>
+                <b id="stat-completed">0</b>
+            </div>
+            <div class="stat-card" style="border-color: #ff0000;">
+                <i class="bi bi-arrow-counterclockwise" style="color: #ff0000; filter: drop-shadow(0 0 15px #ff0000);"></i>
+                <span>مرتجعات</span>
+                <b id="stat-returned">0</b>
+            </div>
+            <div class="stat-card" style="border-color: #ff8c00;">
+                <i class="bi bi-cash-stack" style="color: #ff8c00; filter: drop-shadow(0 0 15px #ff8c00);"></i>
+                <span>إجمالي الأرباح</span>
+                <b id="stat-profit">0</b>
+            </div>
+            <div class="stat-card" style="border-color: #ff1493;">
+                <i class="bi bi-fire" style="color: #ff1493; filter: drop-shadow(0 0 15px #ff1493);"></i>
+                <span>الأكثر مبيعاً</span>
+                <b id="stat-best-seller" style="font-size: 1rem; display: block; margin-top: 5px; min-height: 1.5em;">-</b>
+                <small id="stat-best-seller-qty" style="font-size: 0.8rem; opacity: 0.7;"></small>
+            </div>
+        </div>
+
+        <!-- قسم الفرز والبحث -->
+        <div class="filters-section">
+            <div class="filter-group">
+                <label><i class="bi bi-hash"></i> رقم الأوردر</label>
+                <div class="filter-input-wrapper">
+                    <i class="bi bi-search"></i>
+                    <input type="number" id="order-id-filter" placeholder="رقم الطلب..." oninput="applyFilters()">
+                </div>
+            </div>
+            <div class="filter-group">
+                <label><i class="bi bi-calendar3"></i> تصفية بالتاريخ</label>
+                <div class="date-filter-wrapper filter-input-wrapper">
+                    <i class="bi bi-calendar-event"></i>
+                    <input type="text" id="date-filter" placeholder="اختر التاريخ..." style="flex: 1; cursor: pointer; padding-right: 35px;">
+                    <button class="date-quick-btn" onclick="setTodayFilter()" title="طلبات اليوم">
+                        <i class="bi bi-calendar-check"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label><i class="bi bi-person-badge"></i> الاسم أو الموبايل</label>
+                <div class="filter-input-wrapper">
+                    <i class="bi bi-person"></i>
+                    <input type="text" id="search-filter" placeholder="اكتبي للبحث..." oninput="applyFilters()">
+                </div>
+            </div>
+            <div class="filter-group">
+                <label><i class="bi bi-geo-alt"></i> المحافظة</label>
+                <div class="filter-input-wrapper">
+                    <i class="bi bi-map"></i>
+                    <select id="province-filter" onchange="applyFilters()">
+                        <option value="">كل المحافظات</option>
+                        <option value="مترو">مترو</option>
+                        <option value="القاهرة">القاهرة</option>
+                        <option value="الجيزة">الجيزة</option>
+                        <option value="اكتوبر">اكتوبر</option>
+                        <option value="التجمع">التجمع</option>
+                        <option value="المقطم">المقطم</option>
+                        <option value="البدرشين">البدرشين</option>
+                        <option value="الحوامدية">الحوامدية</option>
+                        <option value="العبور">العبور</option>
+                        <option value="مدينتي">مدينتي</option>
+                        <option value="الشروق">الشروق</option>
+                        <option value="العاشر">العاشر</option>
+                        <option value="اسكندرية">اسكندرية</option>
+                        <option value="السويس">السويس</option>
+                        <option value="بورسعيد">بورسعيد</option>
+                        <option value="اسماعلية">اسماعلية</option>
+                        <option value="الشرقية">الشرقية</option>
+                        <option value="الغربية">الغربية</option>
+                        <option value="الدقهلية">الدقهلية</option>
+                        <option value="المنوفية">المنوفية</option>
+                        <option value="كفر الشيخ">كفر الشيخ</option>
+                        <option value="البحيرة">البحيرة</option>
+                        <option value="دمياط">دمياط</option>
+                        <option value="بني سويف">بني سويف</option>
+                        <option value="الفيوم">الفيوم</option>
+                        <option value="المنيا">المنيا</option>
+                        <option value="اسيوط">اسيوط</option>
+                        <option value="سوهاج">سوهاج</option>
+                        <option value="قنا">قنا</option>
+                        <option value="الاقصر">الاقصر</option>
+                        <option value="اسوان">اسوان</option>
+                        <option value="الغردقة">الغردقة</option>
+                        <option value="راس غارب">راس غارب</option>
+                        <option value="القصير">القصير</option>
+                        <option value="مرسي علم">مرسي علم</option>
+                        <option value="سفاجة">سفاجة</option>
+                    </select>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label><i class="bi bi-info-circle"></i> حالة الطلب</label>
+                <div class="filter-input-wrapper">
+                    <i class="bi bi-tag"></i>
+                    <select id="status-filter" onchange="applyFilters()">
+                        <option value="">كل الحالات</option>
+                        <option value="pending">جديد (Pending)</option>
+                        <option value="shipping">جاري الشحن</option>
+                        <option value="shipped">تم الشحن</option>
+                        <option value="completed">تم التوصيل</option>
+                        <option value="returned">مرتجع</option>
+                    </select>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label><i class="bi bi-sort-down"></i> الترتيب</label>
+                <div class="filter-input-wrapper">
+                    <i class="bi bi-clock-history"></i>
+                    <select id="time-sort-filter" onchange="applyFilters()">
+                        <option value="desc">الأحدث أولاً</option>
+                        <option value="asc">الأقدم أولاً</option>
+                    </select>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>&nbsp;</label>
+                <button class="reset-all-btn" onclick="resetAllFilters()">
+                    <i class="bi bi-trash"></i> مسح الفلاتر
+                </button>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="sortable" onclick="sortBy('id')">رقم الطلب <i class="bi bi-hash"></i></th>
+                        <th class="sortable" onclick="sortBy('created_at')">التوقيت <i class="bi bi-calendar-event-fill"></i></th>
+                        <th class="sortable" onclick="sortBy('customer_name')">الاسم <i class="bi bi-person"></i></th>
+                        <th>الموبايل <i class="bi bi-telephone-fill"></i></th>
+                        <th>واتساب <i class="bi bi-whatsapp"></i></th>
+                        <th class="sortable" onclick="sortBy('province')">المحافظة <i class="bi bi-geo-alt-fill"></i></th>
+                        <th>العنوان <i class="bi bi-house-fill"></i></th>
+                        <th>الكتب المطلوبة <i class="bi bi-book-fill"></i></th>
+                        <th class="sortable" onclick="sortBy('total_amount')">الإجمالي بالشحن <i class="bi bi-cash-stack"></i></th>
+                        <th>الحالة <i class="bi bi-info-circle-fill"></i></th>
+                    </tr>
+                </thead>
+                <tbody id="orders-table-body">
+                    <tr><td colspan="10" style="text-align:center;">جاري تحميل الطلبات...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="details-chat-section" class="details-chat-grid">
+            <div class="card">
+                <h3>تفاصيل الطلب والبيانات</h3>
+                <div id="order-info-display"></div>
+            </div>
+            
+            <div class="card chat-container">
+                <h3 id="chat-header">شات الدعم</h3>
+                <div id="chat-body"></div>
+                <div class="input-area">
+                    <input type="text" id="admin-input" placeholder="اكتب ردك هنا..." onkeypress="if(event.key==='Enter') sendReply()">
+                    <button class="send-btn" onclick="sendReply()">إرسال <i class="bi bi-send-fill"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button class="export-btn" onclick="exportToExcel()">
+        <i class="bi bi-file-earmark-excel"></i> تحميل كملف Excel
+    </button>
+    </div>
+
+    <script>
+        const supabaseUrl = 'https://ywbmamklqyrahwqifqdj.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3Ym1hbWtscXlyYWh3cWlmcWRqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTQ4MDM5OSwiZXhwIjoyMDkxMDU2Mzk5fQ.bHOZHb1zDAe-LUX1Vtt5G5UabhfHxUlQvrplxvZ0Dgo';
+        const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+        let allOrders = [];
+        let currentOrders = [];
+        let activeChatPhone = null;
+        let sortDirection = 1;
+        let currentSortCol = 'created_at';
+        let fp; // متغير لمكتبة التقويم
+
+        // قاموس الترجمة والألوان للحالات
+        const statusLabels = {
+            'pending': 'جديد',
+            'shipping': 'جاري الشحن',
+            'shipped': 'تم الشحن',
+            'completed': 'تم التوصيل',
+            'returned': 'مرتجع'
+        };
+        const statusClasses = {
+            'pending': 'badge-pending',
+            'shipping': 'badge-shipping',
+            'shipped': 'badge-shipped',
+            'completed': 'badge-completed',
+            'returned': 'badge-returned'
+        };
+        const statusIcons = {
+            'pending': 'bi-lightning-charge-fill',
+            'shipping': 'bi-truck',
+            'shipped': 'bi-box-seam',
+            'completed': 'bi-check-circle-fill',
+            'returned': 'bi-backspace-reverse-fill'
+        };
+
+        // وظيفة لتحويل الوقت من UTC لتوقيت القاهرة بالضبط
+        function formatEgyptTime(dateString) {
+            const options = { 
+                timeZone: 'Africa/Cairo', 
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit',
+                hour12: true 
+            };
+            return new Date(dateString).toLocaleString('en-GB', options);
+        }
+
+        // وظائف احترافية لفلتر التاريخ
+        function setTodayFilter() {
+            fp.setDate(new Date());
+            applyFilters();
+        }
+
+        function resetAllFilters() {
+            document.getElementById('order-id-filter').value = '';
+            fp.clear();
+            document.getElementById('search-filter').value = '';
+            document.getElementById('province-filter').value = '';
+            document.getElementById('status-filter').value = '';
+            document.getElementById('time-sort-filter').value = 'desc';
+            
+            applyFilters();
+        }
+
+        async function fetchOrders() {
+            const { data } = await _supabase.from('orders').select('*').order('created_at', { ascending: false });
+            if (data) {
+                allOrders = data;
+                currentOrders = [...data];
+                updateStats(data);
+                renderTable(currentOrders);
+            }
+        }
+
+        function updateStats(data) {
+            document.getElementById('stat-total').innerText = data.length;
+            document.getElementById('stat-pending').innerText = data.filter(o => o.status === 'pending').length;
+            document.getElementById('stat-shipping').innerText = data.filter(o => o.status === 'shipping').length;
+            document.getElementById('stat-shipped').innerText = data.filter(o => o.status === 'shipped').length;
+            document.getElementById('stat-completed').innerText = data.filter(o => o.status === 'completed').length;
+            document.getElementById('stat-returned').innerText = data.filter(o => o.status === 'returned').length;
+
+            // حساب إجمالي الأرباح
+            const totalProfit = data.reduce((acc, o) => acc + (parseFloat(o.total_amount) || 0), 0);
+            document.getElementById('stat-profit').innerText = totalProfit.toLocaleString() + ' ج.م';
+
+            // حساب الكتاب الأكثر مبيعاً
+            const salesMap = {};
+            data.forEach(order => {
+                if (order.items && Array.isArray(order.items)) {
+                    order.items.forEach(item => {
+                        salesMap[item.title] = (salesMap[item.title] || 0) + (item.qty || 1);
+                    });
+                }
+            });
+
+            const sortedSales = Object.entries(salesMap).sort((a, b) => b[1] - a[1]);
+            if (sortedSales.length > 0) {
+                document.getElementById('stat-best-seller').innerText = sortedSales[0][0];
+                document.getElementById('stat-best-seller-qty').innerText = `بيع منه ${sortedSales[0][1]} نسخة`;
+            } else {
+                document.getElementById('stat-best-seller').innerText = "لا توجد بيانات";
+            }
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('orders-table-body');
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">لا توجد نتائج تطابق بحثك</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(o => `
+                    <tr id="row-${o.id}" onclick="selectOrder('${o.id}')">
+                        <td><b>#${o.id}</b></td>
+                        <td dir="ltr" style="font-size:0.7rem;">${formatEgyptTime(o.created_at)}</td>
+                        <td>${o.customer_name}</td>
+                        <td>${o.customer_phone}</td>
+                        <td><a href="https://wa.me/2${o.customer_whatsapp}" target="_blank" class="wa-link" title="فتح شات واتساب" onclick="event.stopPropagation()"><i class="bi bi-whatsapp"></i></a> ${o.customer_whatsapp}</td>
+                        <td>${o.province}</td>
+                        <td><div style="max-width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${o.address}</div></td>
+                        <td>
+                            <div style="max-width:200px; font-size:0.8rem; line-height:1.4; color: #d4a373; font-weight: bold;">
+                                ${o.items ? o.items.map(item => `• ${item.title} (x${item.qty})`).join('<br>') : 'لا توجد بيانات'}
+                            </div>
+                        </td>
+                        <td><b>${o.total_amount} ج.م</b></td>
+                        <td><span class="status-badge ${statusClasses[o.status] || ''}"><i class="bi ${statusIcons[o.status] || 'bi-dot'}"></i> ${statusLabels[o.status] || o.status}</span></td>
+                    </tr>
+                `).join('');
+        }
+
+        function applyFilters() {
+            const orderId = document.getElementById('order-id-filter').value;
+            const filterDate = document.getElementById('date-filter').value;
+            const searchTerm = document.getElementById('search-filter').value.toLowerCase();
+            const province = document.getElementById('province-filter').value;
+            const status = document.getElementById('status-filter').value;
+            const timeSort = document.getElementById('time-sort-filter').value;
+
+            currentOrders = allOrders.filter(o => {
+                // فلترة برقم الأوردر
+                const matchOrderId = orderId === "" || String(o.id).includes(orderId);
+                
+                // فلترة بالتاريخ (يوم/شهر/سنة)
+                const oDate = new Date(o.created_at);
+                const oDateStr = oDate.getFullYear() + '-' + String(oDate.getMonth() + 1).padStart(2, '0') + '-' + String(oDate.getDate()).padStart(2, '0');
+                const matchDate = filterDate === "" || oDateStr === filterDate;
+
+                const matchSearch = o.customer_name.toLowerCase().includes(searchTerm) || 
+                                    o.customer_phone.includes(searchTerm) || 
+                                    o.address.toLowerCase().includes(searchTerm);
+                const matchProvince = province === "" || o.province === province;
+                const matchStatus = status === "" || o.status === status;
+                
+                return matchOrderId && matchDate && matchSearch && matchProvince && matchStatus;
+            });
+
+            // تطبيق الترتيب الزمني
+            currentOrders.sort((a, b) => {
+                const dateA = new Date(a.created_at);
+                const dateB = new Date(b.created_at);
+                return timeSort === 'desc' ? dateB - dateA : dateA - dateB;
+            });
+
+            renderTable(currentOrders);
+        }
+
+        function sortBy(col) {
+            if (currentSortCol === col) {
+                sortDirection *= -1;
+            } else {
+                currentSortCol = col;
+                sortDirection = 1;
+            }
+
+            currentOrders.sort((a, b) => {
+                let valA = a[col];
+                let valB = b[col];
+                
+                if (typeof valA === 'string') {
+                    return valA.localeCompare(valB) * sortDirection;
+                }
+                return (valA - valB) * sortDirection;
+            });
+
+            renderTable(currentOrders);
+        }
+
+        // وظيفة لتحديث حالة الطلب في قاعدة البيانات
+        async function updateOrderStatus(orderId, newStatus) {
+            const { error } = await _supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+            if (error) {
+                alert("حدث خطأ أثناء تحديث الحالة: " + error.message);
+            } else {
+                // تحديث البيانات محلياً وإعادة التصفية
+                const order = allOrders.find(o => String(o.id) === String(orderId));
+                if (order) order.status = newStatus;
+                applyFilters();
+            }
+        }
+
+        function selectOrder(orderId) {
+            const order = currentOrders.find(o => String(o.id) === String(orderId));
+            if (!order) return;
+            
+            activeChatPhone = order.customer_phone;
+            
+            // تمييز الصف المختار في الجدول
+            document.querySelectorAll('tr').forEach(r => r.classList.remove('active'));
+            document.getElementById(`row-${orderId}`).classList.add('active');
+
+            // إظهار قسم التفاصيل والشات
+            document.getElementById('details-chat-section').style.display = 'grid';
+
+            const infoDisplay = document.getElementById('order-info-display');
+            infoDisplay.innerHTML = `
+                <div class="order-details-box">
+                    <div class="edit-field">
+                        <label>اسم العميل:</label>
+                        <input type="text" id="edit-name" value="${order.customer_name}">
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <div class="edit-field"><label>الموبايل:</label><input type="text" id="edit-phone" value="${order.customer_phone}"></div>
+                        <div class="edit-field"><label>واتساب:</label><input type="text" id="edit-whatsapp" value="${order.customer_whatsapp}"></div>
+                    </div>
+                    <div class="edit-field">
+                        <label>المحافظة:</label>
+                        <input type="text" id="edit-province" value="${order.province}">
+                    </div>
+                    <div class="edit-field"><label>العنوان:</label><textarea id="edit-address" rows="2">${order.address}</textarea></div>
+                    <div class="edit-field"><label>ملاحظات:</label><textarea id="edit-notes" rows="2">${order.notes || ''}</textarea></div>
+                    
+                    <div class="edit-field">
+                        <label>حالة الطلب:</label>
+                        <select onchange="updateOrderStatus('${order.id}', this.value)" style="background: rgba(0,0,0,0.5); color: #ffd700; border: 1px solid #d4a373; border-radius: 8px; padding: 8px; font-family: 'Cairo'; cursor: pointer; font-weight: bold;">
+                            <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>جديد</option>
+                            <option value="shipping" ${order.status === 'shipping' ? 'selected' : ''}>جاري الشحن</option>
+                            <option value="shipped" ${order.status === 'shipped' ? 'selected' : ''}>تم الشحن</option>
+                            <option value="completed" ${order.status === 'completed' ? 'selected' : ''}>تم التوصيل</option>
+                            <option value="returned" ${order.status === 'returned' ? 'selected' : ''}>مرتجع</option>
+                        </select>
+                    </div>
+
+                    <button class="send-btn" style="width:100%; margin-top:10px; background: #27ae60; color: white;" onclick="saveOrderDetails('${order.id}')">
+                        حفظ التعديلات <i class="bi bi-save-fill"></i>
+                    </button>
+
+                    <hr style="border:0; border-top:1px solid rgba(212,163,115,0.2); margin:10px 0;">
+                    <p style="color:#d4a373; font-weight:bold; margin-bottom:10px;">الكتب المطلوبة:</p>
+                    ${order.items.map(item => `
+                        <div class="order-item-row">
+                            <span>- ${item.title} (عدد: ${item.qty})</span> 
+                            <span>${item.price * item.qty} ج.م</span>
+                        </div>
+                    `).join('')}
+                    <hr style="border:0; border-top:1px solid rgba(212,163,115,0.2); margin:10px 0;">
+                    <div class="order-item-row" style="margin-top:10px; font-weight:bold; color:#d4a373;"><span>الإجمالي الكلي:</span> <span>${order.total_amount} ج.م</span></div>
+                </div>
+            `;
+            
+            document.getElementById('chat-header').innerText = "شات مع العميل: " + order.customer_name;
+            
+            loadMessages(order.customer_phone);
+            
+            // تحديث الشات لحظياً للعميل المختار فقط
+            _supabase.removeAllChannels(); 
+            _supabase.channel('admin-sync').on('postgres_changes', { 
+                event: 'INSERT', 
+                schema: 'public', 
+                table: 'messages', 
+                filter: `customer_phone=eq.${order.customer_phone}` 
+            }, payload => {
+                if (payload.new.sender === 'user') appendMsg(payload.new.text, 'user');
+            }).subscribe();
+        }
+
+        // وظيفة حفظ البيانات المعدلة للطلب
+        async function saveOrderDetails(orderId) {
+            const name = document.getElementById('edit-name').value;
+            const phone = document.getElementById('edit-phone').value;
+            const whatsapp = document.getElementById('edit-whatsapp').value;
+            const province = document.getElementById('edit-province').value;
+            const address = document.getElementById('edit-address').value;
+            const notes = document.getElementById('edit-notes').value;
+
+            const { error } = await _supabase.from('orders').update({
+                customer_name: name,
+                customer_phone: phone,
+                customer_whatsapp: whatsapp,
+                province: province,
+                address: address,
+                notes: notes
+            }).eq('id', orderId);
+
+            if (error) {
+                alert("عذراً، حدث خطأ أثناء الحفظ: " + error.message);
+            } else {
+                alert("تم تحديث بيانات الطلب بنجاح! ✅");
+                fetchOrders(); // إعادة تحميل الجدول لتظهر التعديلات
+            }
+        }
+
+        async function loadMessages(phone) {
+            const { data } = await _supabase.from('messages').select('*').eq('customer_phone', phone).order('created_at', { ascending: true });
+            const body = document.getElementById('chat-body');
+            body.innerHTML = '';
+            if (data) data.forEach(m => appendMsg(m.text, m.sender));
+        }
+
+        function appendMsg(text, sender) {
+            const body = document.getElementById('chat-body');
+            const div = document.createElement('div');
+            div.className = 'msg msg-' + sender;
+            div.innerText = text;
+            body.appendChild(div);
+            body.scrollTop = body.scrollHeight;
+        }
+
+        async function sendReply() {
+            const input = document.getElementById('admin-input');
+            const text = input.value.trim();
+            if (!text || !activeChatPhone) return;
+            
+            // إضافة رد الأدمن فوراً للواجهة
+            appendMsg(text, 'admin');
+            
+            await _supabase.from('messages').insert([{ 
+                customer_phone: activeChatPhone, 
+                sender: 'admin', 
+                text: text 
+            }]);
+            input.value = '';
+        }
+
+        // وظيفة تصدير البيانات إلى شيت إكسيل (CSV)
+        function exportToExcel() {
+            if (allOrders.length === 0) return;
+            
+            // إضافة الـ BOM لدعم اللغة العربية في إكسيل
+            let csvContent = "\uFEFF"; 
+            csvContent += "رقم الطلب,التاريخ,اسم العميل,رقم الموبايل,واتساب,المحافظة,العنوان,الكتب المطلوبة,الإجمالي بالشحن,الحالة\n";
+            
+            allOrders.forEach(o => {
+                const booksText = o.items ? o.items.map(item => `${item.title} (x${item.qty})`).join(' | ') : '';
+                const row = [
+                    `#${o.id}`,
+                    formatEgyptTime(o.created_at).replace(',', ''),
+                    o.customer_name,
+                    o.customer_phone,
+                    o.customer_whatsapp,
+                    o.province,
+                    o.address.replace(',', '-'), // إزالة الفواصل لعدم تخريب ملف الـ CSV
+                    booksText.replace(',', '-'),
+                    o.total_amount,
+                    o.status
+                ].join(",");
+                csvContent += row + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `طلبات_يوتوبيا_${new Date().toLocaleDateString('en-GB')}.csv`);
+            link.click();
+        }
+
+        // تهيئة الصفحة والتقويم الاحترافي
+        document.addEventListener('DOMContentLoaded', () => {
+            fp = flatpickr("#date-filter", {
+                dateFormat: "Y-m-d",
+                disableMobile: "true", // لإجبار ظهور التقويم الاحترافي حتى على الموبايل
+                onChange: () => applyFilters()
+            });
+            fetchOrders();
+        });
+    </script>
+</body>
+</html>
